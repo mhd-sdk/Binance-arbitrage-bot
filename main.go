@@ -9,7 +9,6 @@ import (
 )
 
 func main() {
-
 	logger := slog.New(tint.NewHandler(os.Stdout, nil))
 	logger.Info("Starting DeltΔ  BOT")
 
@@ -19,4 +18,5 @@ func main() {
 		logger.Error(err.Error())
 		return
 	}
+	instance.Watch()
 }

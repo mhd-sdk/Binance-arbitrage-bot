@@ -5,12 +5,35 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strconv"
 )
 
-type ExchangeInfo []models.Pair
+func GetExchangeInfo() (models.ExchangeInfo, error) {
+	url := "https://api.binance.com/api/v3/exchangeInfo"
+	resp, err := http.Get(url)
+	if err != nil {
+		return models.ExchangeInfo{}, err
+	}
 
-func GetExchangeInfo() (ExchangeInfo, error) {
-	url := "https://api.binance.com/sapi/v1/convert/exchangeInfo"
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return models.ExchangeInfo{}, err
+	}
+
+	exchangeInfo := models.ExchangeInfo{}
+
+	err = json.Unmarshal(body, &exchangeInfo)
+	if err != nil {
+		return models.ExchangeInfo{}, err
+	}
+
+	return exchangeInfo, nil
+}
+
+func GetSymbolPrices() (map[string]float64, error) {
+	url := "https://api.binance.com/api/v3/ticker/price"
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, err
@@ -23,12 +46,25 @@ func GetExchangeInfo() (ExchangeInfo, error) {
 		return nil, err
 	}
 
-	exchangeInfo := ExchangeInfo{}
+	var symbolPrices []struct {
+		Symbol string `json:"symbol"`
+		Price  string `json:"price"`
+	}
 
-	err = json.Unmarshal(body, &exchangeInfo)
+	err = json.Unmarshal(body, &symbolPrices)
 	if err != nil {
 		return nil, err
 	}
 
-	return exchangeInfo, nil
+	prices := map[string]float64{}
+
+	for _, symbolPrice := range symbolPrices {
+		price, err := strconv.ParseFloat(symbolPrice.Price, 64)
+		if err != nil {
+			return nil, err
+		}
+		prices[symbolPrice.Symbol] = price
+	}
+
+	return prices, nil
 }
