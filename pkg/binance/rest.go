@@ -4,8 +4,8 @@ import (
 	"DeltA/pkg/models"
 	"encoding/json"
 	"io"
+	"math/big"
 	"net/http"
-	"strconv"
 )
 
 func GetExchangeInfo() (models.ExchangeInfo, error) {
@@ -32,7 +32,7 @@ func GetExchangeInfo() (models.ExchangeInfo, error) {
 	return exchangeInfo, nil
 }
 
-func GetSymbolPrices() (map[string]float64, error) {
+func GetSymbolPrices() (map[string]*big.Float, error) {
 	url := "https://api.binance.com/api/v3/ticker/price"
 	resp, err := http.Get(url)
 	if err != nil {
@@ -56,10 +56,11 @@ func GetSymbolPrices() (map[string]float64, error) {
 		return nil, err
 	}
 
-	prices := map[string]float64{}
+	prices := map[string]*big.Float{}
 
 	for _, symbolPrice := range symbolPrices {
-		price, err := strconv.ParseFloat(symbolPrice.Price, 64)
+		// price, err := strconv.ParseFloat(symbolPrice.Price, 64)
+		price, _, err := big.ParseFloat(symbolPrice.Price, 10, 64, big.ToNearestEven)
 		if err != nil {
 			return nil, err
 		}

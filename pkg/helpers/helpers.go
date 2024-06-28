@@ -70,14 +70,6 @@ func buildTriadeSymbols(exchangeInfo models.ExchangeInfo, triade models.Triade) 
 	return symbols
 }
 
-func FormatTriades(triades []models.Triade) string {
-	formatted := ""
-	for _, triade := range triades {
-		formatted += triade.Assets[0] + " -> " + triade.Assets[1] + " -> " + triade.Assets[2] + "\n"
-	}
-	return formatted
-}
-
 func BuildStreamURL(pairSymbols []string) string {
 	url := "wss://stream.binance.com:9443/ws/"
 	for i, symbol := range pairSymbols {
