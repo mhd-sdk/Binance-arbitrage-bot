@@ -3,10 +3,10 @@ package instance
 import (
 	"DeltA/pkg/binance"
 	"DeltA/pkg/helpers"
+	"DeltA/pkg/logging"
 	"DeltA/pkg/models"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"math/big"
 	"sync"
 	"time"
@@ -20,17 +20,25 @@ type Instance struct {
 	SymbolPrices        map[string]*big.Float
 	StartingStableAsset string
 	Triades             []models.Triade
-	Logger              *slog.Logger
+	Logger              *logging.Logger
 }
 
-func NewInstance(logger *slog.Logger) *Instance {
-	mu := new(sync.Mutex)
-	return &Instance{Logger: logger, Mutex: mu}
+func NewInstance() *Instance {
+	return &Instance{}
 }
 
 func (i *Instance) Init() (err error) {
-	i.StartingStableAsset = "USDT"
-	i.Logger.Info("Loading exchange info from Binance...")
+	i.Mutex = new(sync.Mutex)
+	logger, err := logging.NewLogger()
+	i.Logger = logger
+	i.Logger.Slog.Info("Starting DeltΔ  BOT")
+	if err != nil {
+		logger.Slog.Error(err.Error())
+		return err
+	}
+
+	i.StartingStableAsset = "USDC"
+	i.Logger.Slog.Info("Loading exchange info from Binance...")
 	i.ExchangeInfo, err = binance.GetExchangeInfo()
 	if err != nil {
 		return err
@@ -43,7 +51,7 @@ func (i *Instance) Init() (err error) {
 
 	i.Triades = helpers.BuildTriades(i.ExchangeInfo, i.StartingStableAsset)
 
-	i.Logger.Info(fmt.Sprintf("Generated %d triades", len(i.Triades)))
+	i.Logger.Slog.Info(fmt.Sprintf("Generated %d triades", len(i.Triades)))
 	return nil
 }
 
@@ -61,31 +69,31 @@ func (i *Instance) Watch() {
 			}
 
 			url := helpers.BuildStreamURL(pairSymbols)
-			i.Logger.Info(fmt.Sprintf("Connecting to %s", url))
+			i.Logger.Slog.Info(fmt.Sprintf("Connecting to %s", url))
 
 			for {
 
 				conn, _, err := websocket.DefaultDialer.Dial(url, nil)
 				if err != nil {
-					i.Logger.Error(fmt.Sprintf("Error connecting to %s: %s", url, err))
+					i.Logger.Slog.Error(fmt.Sprintf("Error connecting to %s: %s", url, err))
 					time.Sleep(5 * time.Second) // Retry after 5 seconds
 					continue
 				}
 
 				defer conn.Close()
-				i.Logger.Info(fmt.Sprintf("Watching for arbitrage opportunities... (%s/%s/%s)", triade.Assets[0], triade.Assets[1], triade.Assets[2]))
+				i.Logger.Slog.Info(fmt.Sprintf("Watching for arbitrage opportunities... (%s/%s/%s)", triade.Assets[0], triade.Assets[1], triade.Assets[2]))
 
 				for {
 					_, message, err := conn.ReadMessage()
 					if err != nil {
-						i.Logger.Error("Read error:", err)
+						i.Logger.Slog.Error("Read error:", err)
 						break
 					}
 
 					var trade models.Trade
 					err = json.Unmarshal(message, &trade)
 					if err != nil {
-						i.Logger.Error("Unmarshal error:", err)
+						i.Logger.Slog.Error("Unmarshal error:", err)
 						continue
 					}
 
@@ -93,7 +101,7 @@ func (i *Instance) Watch() {
 					// parse big float
 					price, _, err := big.ParseFloat(trade.Price, 10, 64, big.ToNearestEven)
 					if err != nil {
-						i.Logger.Error(err.Error())
+						i.Logger.Slog.Error(err.Error())
 						continue
 					}
 					i.Mutex.Lock()
