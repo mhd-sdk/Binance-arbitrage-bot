@@ -1,36 +1,13 @@
 package binance
 
 import (
-	"DeltA/pkg/models"
 	"encoding/json"
 	"io"
 	"math/big"
 	"net/http"
+
+	binance_connector "github.com/binance/binance-connector-go"
 )
-
-func GetExchangeInfo() (models.ExchangeInfo, error) {
-	url := "https://api.binance.com/api/v3/exchangeInfo"
-	resp, err := http.Get(url)
-	if err != nil {
-		return models.ExchangeInfo{}, err
-	}
-
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return models.ExchangeInfo{}, err
-	}
-
-	exchangeInfo := models.ExchangeInfo{}
-
-	err = json.Unmarshal(body, &exchangeInfo)
-	if err != nil {
-		return models.ExchangeInfo{}, err
-	}
-
-	return exchangeInfo, nil
-}
 
 func GetSymbolPrices() (map[string]*big.Float, error) {
 	url := "https://api.binance.com/api/v3/ticker/price"
@@ -46,10 +23,7 @@ func GetSymbolPrices() (map[string]*big.Float, error) {
 		return nil, err
 	}
 
-	var symbolPrices []struct {
-		Symbol string `json:"symbol"`
-		Price  string `json:"price"`
-	}
+	var symbolPrices []*binance_connector.TickerPriceResponse
 
 	err = json.Unmarshal(body, &symbolPrices)
 	if err != nil {
@@ -68,8 +42,4 @@ func GetSymbolPrices() (map[string]*big.Float, error) {
 	}
 
 	return prices, nil
-}
-
-func PostOrder() error {
-	return nil
 }

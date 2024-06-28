@@ -4,9 +4,11 @@ import (
 	"DeltA/pkg/models"
 	"slices"
 	"strings"
+
+	binance_connector "github.com/binance/binance-connector-go"
 )
 
-func ListAllAssets(exchangeInfo models.ExchangeInfo) []string {
+func ListAllAssets(exchangeInfo *binance_connector.ExchangeInfoResponse) []string {
 	availableAssets := []string{}
 	for _, pair := range exchangeInfo.Symbols {
 		if !slices.Contains(availableAssets, pair.BaseAsset) {
@@ -19,7 +21,7 @@ func ListAllAssets(exchangeInfo models.ExchangeInfo) []string {
 	return availableAssets
 }
 
-func BuildTriades(exchangeInfo models.ExchangeInfo, startingAsset string) []models.Triade {
+func BuildTriades(exchangeInfo *binance_connector.ExchangeInfoResponse, startingAsset string) []models.Triade {
 	allAssets := ListAllAssets(exchangeInfo)
 	tempTriades := []models.Triade{}
 
@@ -49,8 +51,8 @@ func BuildTriades(exchangeInfo models.ExchangeInfo, startingAsset string) []mode
 	return finalTriades
 }
 
-func buildTriadeSymbols(exchangeInfo models.ExchangeInfo, triade models.Triade) []models.Symbol {
-	symbols := []models.Symbol{}
+func buildTriadeSymbols(exchangeInfo *binance_connector.ExchangeInfoResponse, triade models.Triade) []*binance_connector.SymbolInfo {
+	symbols := []*binance_connector.SymbolInfo{}
 	for c, symbol := range triade.Assets {
 		a := symbol
 		b := triade.Assets[(c+1)%3]

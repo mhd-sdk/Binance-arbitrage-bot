@@ -5,18 +5,24 @@ import (
 	"DeltA/pkg/helpers"
 	"DeltA/pkg/logging"
 	"DeltA/pkg/models"
+	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"math/big"
+	"os"
 	"sync"
 	"time"
 
+	binance_connector "github.com/binance/binance-connector-go"
 	"github.com/gorilla/websocket"
 )
 
 type Instance struct {
-	Mutex               *sync.Mutex
-	ExchangeInfo        models.ExchangeInfo
+	BinanceConn  *binance_connector.Client
+	Mutex        *sync.Mutex
+	ExchangeInfo *binance_connector.ExchangeInfoResponse
+	// SymbolPrices        map[string]*big.Float
 	SymbolPrices        map[string]*big.Float
 	StartingStableAsset string
 	Triades             []models.Triade
@@ -28,18 +34,27 @@ func NewInstance() *Instance {
 }
 
 func (i *Instance) Init() (err error) {
+	BINANCE_API_KEY := os.Getenv("BINANCE_API_KEY")
+	BINANCE_SECRET_KEY := os.Getenv("BINANCE_SECRET_KEY")
+	i.BinanceConn = binance_connector.NewClient(BINANCE_API_KEY, BINANCE_SECRET_KEY, "https://api.binance.com")
+
 	i.Mutex = new(sync.Mutex)
+
 	logger, err := logging.NewLogger()
-	i.Logger = logger
-	i.Logger.Slog.Info("Starting DeltΔ  BOT")
 	if err != nil {
-		logger.Slog.Error(err.Error())
+		slog.Error(err.Error())
 		return err
 	}
+	i.Logger = logger
+
+	i.Logger.Slog.Info("Starting DeltΔ  BOT")
 
 	i.StartingStableAsset = "USDC"
+
 	i.Logger.Slog.Info("Loading exchange info from Binance...")
-	i.ExchangeInfo, err = binance.GetExchangeInfo()
+	// i.ExchangeInfo, err = binance.GetExchangeInfo()
+	i.ExchangeInfo, err = i.BinanceConn.NewExchangeInfoService().Do(context.Background())
+
 	if err != nil {
 		return err
 	}
@@ -72,7 +87,6 @@ func (i *Instance) Watch() {
 			i.Logger.Slog.Info(fmt.Sprintf("Connecting to %s", url))
 
 			for {
-
 				conn, _, err := websocket.DefaultDialer.Dial(url, nil)
 				if err != nil {
 					i.Logger.Slog.Error(fmt.Sprintf("Error connecting to %s: %s", url, err))
@@ -107,11 +121,6 @@ func (i *Instance) Watch() {
 					i.Mutex.Lock()
 					i.SymbolPrices[trade.Symbol] = price
 					i.Mutex.Unlock()
-					// if i.SymbolPrices[triade.Assets[0]] == nil || i.SymbolPrices[triade.Assets[1]] == nil || i.SymbolPrices[triade.Assets[2]] == nil {
-					// 	// print missing prices
-					// 	i.Logger.Slog.Info(fmt.Sprintf("Missing prices for %s/%s/%s", triade.Assets[0], triade.Assets[1], triade.Assets[2]))
-					// 	continue
-					// }
 
 					i.ScanOpportunities(triade)
 				}

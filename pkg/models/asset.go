@@ -1,8 +1,10 @@
 package models
 
+import binance_connector "github.com/binance/binance-connector-go"
+
 type Triade struct {
 	Assets  []string // (e.g. "BTC", "ETH", "USDT")
-	Symbols []Symbol
+	Symbols []*binance_connector.SymbolInfo
 }
 
 // this function return two possible orders for the triade (both starting from the first asset)
@@ -31,9 +33,9 @@ func (t Triade) OrderAssets(startingAsset string) ([]string, []string) {
 }
 
 // order symbols based on the starting symbol
-func (t Triade) OrderSymbols(startingAsset string) ([]Symbol, []Symbol) {
-	order1Symbols := []Symbol{}
-	order2Symbols := []Symbol{}
+func (t Triade) OrderSymbols(startingAsset string) ([]*binance_connector.SymbolInfo, []*binance_connector.SymbolInfo) {
+	order1Symbols := []*binance_connector.SymbolInfo{}
+	order2Symbols := []*binance_connector.SymbolInfo{}
 
 	order1Assets, order2Assets := t.OrderAssets(startingAsset)
 
@@ -53,7 +55,7 @@ func (t Triade) OrderSymbols(startingAsset string) ([]Symbol, []Symbol) {
 
 }
 
-func FindSymbol(asset1 string, asset2 string, symbols []Symbol) Symbol {
+func FindSymbol(asset1 string, asset2 string, symbols []*binance_connector.SymbolInfo) *binance_connector.SymbolInfo {
 	for _, symbol := range symbols {
 		if symbol.Symbol == asset1+asset2 {
 			return symbol
@@ -62,7 +64,7 @@ func FindSymbol(asset1 string, asset2 string, symbols []Symbol) Symbol {
 		}
 
 	}
-	return Symbol{}
+	return nil
 }
 
 type Trade struct {
