@@ -69,3 +69,7 @@ func GetSymbolPrices() (map[string]*big.Float, error) {
 
 	return prices, nil
 }
+
+func PostOrder() error {
+	return nil
+}

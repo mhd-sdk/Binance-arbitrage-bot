@@ -1,6 +1,7 @@
 package instance
 
 import (
+	"DeltA/pkg/helpers"
 	"DeltA/pkg/models"
 	"fmt"
 	"math/big"
@@ -38,7 +39,7 @@ func (i Instance) ScanOpportunities(triade models.Triade) {
 	// find the two order starting from the first asset
 	order1, _ := triade.OrderAssets(i.StartingStableAsset)
 
-	orderedPairs := OrderedPair{}
+	orderedPairs1 := OrderedPair{}
 
 	for c, asset := range order1 {
 		from := asset
@@ -48,14 +49,16 @@ func (i Instance) ScanOpportunities(triade models.Triade) {
 		price := FindPrice(from, to, i.SymbolPrices)
 		i.Mutex.Unlock()
 
-		orderedPairs = append(orderedPairs, Pair{
+		orderedPairs1 = append(orderedPairs1, Pair{
 			From:  from,
 			To:    to,
 			Price: price,
 		})
 	}
 
-	for _, pair := range orderedPairs {
+	orderedSymbols1, _ := triade.OrderSymbols(i.StartingStableAsset)
+
+	for _, pair := range orderedPairs1 {
 		calculatedBalance[pair.To] = new(big.Float).Quo(calculatedBalance[pair.From], pair.Price)
 		calculatedBalance[pair.From] = big.NewFloat(0)
 	}
@@ -65,19 +68,64 @@ func (i Instance) ScanOpportunities(triade models.Triade) {
 	gainPercentage := new(big.Float).Quo(new(big.Float).Mul(diffBetweenBalances, big.NewFloat(100)), initialBalance[i.StartingStableAsset])
 
 	// printf l'expression
-
-	if gainPercentage.Cmp(big.NewFloat(0.3)) == 1 {
+	if gainPercentage.Cmp(big.NewFloat(1.5)) == 1 {
 		log1 := "Opportunity found for triade: " + order1[0] + "/" + order1[1] + "/" + order1[2]
+		log0 := helpers.BuildStreamURL([]string{order1[0], order1[1], order1[2]})
 		log2 := "Initial balance : " + fmt.Sprint(initialBalance[i.StartingStableAsset]) + i.StartingStableAsset
 		log3 := "New balance : " + fmt.Sprint(calculatedBalance[i.StartingStableAsset]) + i.StartingStableAsset
 		log4 := "Gain: : " + diffBetweenBalances.Text('f', -1) + " " + i.StartingStableAsset + " (" + gainPercentage.Text('f', -1) + "%)"
-		logs := log1 + "\n" + log2 + "\n" + log3 + "\n" + log4 + "\n"
+		log5 := orderedSymbols1[0].Symbol + "\n" + orderedSymbols1[1].Symbol + "\n" + orderedSymbols1[2].Symbol
+		logs := log1 + "\n" + log0 + "\n" + log2 + "\n" + log3 + "\n" + log4 + "\n" + fmt.Sprint(log5)
 		i.Logger.Slog.Info(logs)
 
 		filePath := "logs/" + triade.Assets[0] + "-" + triade.Assets[1] + "-" + triade.Assets[2] + ".txt"
 		i.Logger.FileLog(filePath, logs)
 	}
-	// else if gainPercentage.Cmp(big.NewFloat(-0.3)) == -1 {
+	// else {
+
+	// 	var initialBalance = Balance{
+	// 		i.StartingStableAsset: big.NewFloat(100),
+	// 	}
+	// 	var calculatedBalance = Balance{
+	// 		i.StartingStableAsset: big.NewFloat(100),
+	// 	}
+
+	// 	orderedPairs2 := OrderedPair{}
+
+	// 	for c, asset := range order2 {
+	// 		from := asset
+	// 		to := order2[(c+1)%3]
+
+	// 		i.Mutex.Lock()
+	// 		price := FindPrice(from, to, i.SymbolPrices)
+	// 		i.Mutex.Unlock()
+
+	// 		orderedPairs2 = append(orderedPairs2, Pair{
+	// 			From:  from,
+	// 			To:    to,
+	// 			Price: price,
+	// 		})
+	// 	}
+
+	// 	for _, pair := range orderedPairs2 {
+	// 		calculatedBalance[pair.To] = new(big.Float).Quo(calculatedBalance[pair.From], pair.Price)
+	// 		calculatedBalance[pair.From] = big.NewFloat(0)
+	// 	}
+
+	// 	diffBetweenBalances := new(big.Float).Sub(calculatedBalance[i.StartingStableAsset], initialBalance[i.StartingStableAsset])
+
+	// 	gainPercentage := new(big.Float).Quo(new(big.Float).Mul(diffBetweenBalances, big.NewFloat(100)), initialBalance[i.StartingStableAsset])
+
+	// 	if gainPercentage.Cmp(big.NewFloat(2)) == 1 {
+	// 		log1 := "Opportunity found for triade: " + order2[0] + "/" + order2[1] + "/" + order2[2]
+	// 		log2 := "Initial balance : " + fmt.Sprint(initialBalance[i.StartingStableAsset]) + i.StartingStableAsset
+	// 		log3 := "New balance : " + fmt.Sprint(calculatedBalance[i.StartingStableAsset]) + i.StartingStableAsset
+	// 		log4 := "Gain: : " + diffBetweenBalances.Text('f', -1) + " " + i.StartingStableAsset + " (" + gainPercentage.Text('f', -1) + "%)"
+	// 		log5 := orderedSymbols2
+	// 		logs := log1 + "\n" + log2 + "\n" + log3 + "\n" + log4 + "\n" + fmt.Sprint(log5)
+	// 		i.Logger.Slog.Info(logs)
+	// 	}
+	// }
 
 	// 	var virtualBalance = Balance{
 	// 		"USDT": big.NewFloat(100),

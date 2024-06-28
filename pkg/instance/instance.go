@@ -57,10 +57,10 @@ func (i *Instance) Init() (err error) {
 
 func (i *Instance) Watch() {
 	var wg sync.WaitGroup
-	// wg.Add(len(i.Triades))
-	wg.Add(200)
+	wg.Add(len(i.Triades))
+	// wg.Add(200)
 
-	for _, triade := range i.Triades[:200] {
+	for _, triade := range i.Triades {
 		go func(triade models.Triade) {
 			defer wg.Done()
 			pairSymbols := make([]string, len(triade.Symbols))
@@ -107,6 +107,11 @@ func (i *Instance) Watch() {
 					i.Mutex.Lock()
 					i.SymbolPrices[trade.Symbol] = price
 					i.Mutex.Unlock()
+					// if i.SymbolPrices[triade.Assets[0]] == nil || i.SymbolPrices[triade.Assets[1]] == nil || i.SymbolPrices[triade.Assets[2]] == nil {
+					// 	// print missing prices
+					// 	i.Logger.Slog.Info(fmt.Sprintf("Missing prices for %s/%s/%s", triade.Assets[0], triade.Assets[1], triade.Assets[2]))
+					// 	continue
+					// }
 
 					i.ScanOpportunities(triade)
 				}
