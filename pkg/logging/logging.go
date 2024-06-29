@@ -3,6 +3,7 @@ package logging
 import (
 	"log/slog"
 	"os"
+	"time"
 
 	"github.com/lmittmann/tint"
 )
@@ -27,6 +28,7 @@ func NewLogger() (*Logger, error) {
 }
 
 func (l Logger) FileLog(filePath string, content string) {
+
 	// if file does not exist, create it
 	// else, append to it
 	file := &os.File{}
@@ -47,7 +49,12 @@ func (l Logger) FileLog(filePath string, content string) {
 	}
 
 	// write to the file
-	_, err := file.WriteString(content)
+	_, err := file.WriteString(time.Now().Format("2006-01-02 15:04:05") + " " + content + "\n")
+	if err != nil {
+		l.Slog.Error(err.Error())
+		return
+	}
+	_, err = file.WriteString(content)
 	if err != nil {
 		l.Slog.Error(err.Error())
 		return

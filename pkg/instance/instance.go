@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"math/big"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -84,7 +85,6 @@ func (i *Instance) Watch() {
 			}
 
 			url := helpers.BuildStreamURL(pairSymbols)
-			i.Logger.Slog.Info(fmt.Sprintf("Connecting to %s", url))
 
 			for {
 				conn, _, err := websocket.DefaultDialer.Dial(url, nil)
@@ -95,7 +95,6 @@ func (i *Instance) Watch() {
 				}
 
 				defer conn.Close()
-				i.Logger.Slog.Info(fmt.Sprintf("Watching for arbitrage opportunities... (%s/%s/%s)", triade.Assets[0], triade.Assets[1], triade.Assets[2]))
 
 				for {
 					_, message, err := conn.ReadMessage()
@@ -128,4 +127,57 @@ func (i *Instance) Watch() {
 		}(triade)
 	}
 	wg.Wait()
+}
+
+var orderCount = 0
+var isOrdering = false
+
+func (i *Instance) ComputeTriangularOrders(orderPairs OrderPairs) {
+	if orderCount == 1 || isOrdering {
+		return
+	}
+	isOrdering = true
+	orderCount++
+	i.Logger.Slog.Info("Computing triangular orders...")
+
+	for _, orderPair := range orderPairs {
+		// Step 1: Get the account balance
+		account, err := i.BinanceConn.NewGetAccountService().Do(context.Background())
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		var fromBalance float64
+		for _, balance := range account.Balances {
+			if balance.Asset == orderPair.From {
+				fromBalance, err = strconv.ParseFloat(balance.Free, 64)
+				if err != nil {
+					i.Logger.Slog.Error(err.Error())
+					return
+				}
+				break
+			}
+		}
+
+		price := orderPair.Price
+
+		side := "BUY"
+		if orderPair.To+orderPair.From != orderPair.Symbol.Symbol {
+			side = "SELL"
+			price = new(big.Float).Quo(big.NewFloat(1), price)
+		}
+
+		i.Logger.Slog.Info(fmt.Sprintf("Order %s from:%s to:%s price:%s quoteQty:%f symbol:%s", side, orderPair.From, orderPair.To, orderPair.Price.String(), fromBalance, orderPair.Symbol.Symbol))
+		// order, err := i.BinanceConn.NewCreateOrderService().Symbol(orderPair.Symbol.Symbol).
+		// 	Side(side).Type("MARKET").QuoteOrderQty(fromBalance).
+		// 	Do(context.Background())
+		// if err != nil {
+		// 	binance_connector.PrettyPrint(order)
+		// 	i.Logger.Slog.Error(err.Error())
+		// 	return
+		// }
+
+	}
+	isOrdering = false
 }
