@@ -2,6 +2,7 @@ package helpers
 
 import (
 	"DeltA/pkg/models"
+	"math"
 	"slices"
 	"strings"
 
@@ -81,4 +82,22 @@ func BuildStreamURL(pairSymbols []string) string {
 		}
 	}
 	return url
+}
+
+func FloorToPrecision(num float64, precision int) float64 {
+	factor := math.Pow(10, float64(precision))
+	return math.Floor(num*factor) / factor
+}
+
+func CheckAssetIsBase(asset string, symbol *binance_connector.SymbolInfo) bool {
+	return asset == symbol.BaseAsset
+}
+
+func GetSymbolInfo(symbol string, exchangeInfo *binance_connector.ExchangeInfoResponse) *binance_connector.SymbolInfo {
+	for _, sym := range exchangeInfo.Symbols {
+		if sym.Symbol == symbol {
+			return sym
+		}
+	}
+	return nil
 }
