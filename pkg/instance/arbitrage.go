@@ -62,12 +62,13 @@ func (i *Instance) ScanOpportunities(triade models.Triade) {
 
 	gainPercentage := new(big.Float).Sub(calculatedBalance[i.StartingStableAsset], initialBalance[i.StartingStableAsset])
 
-	if gainPercentage.Cmp(big.NewFloat(5)) == 1 && gainPercentage.Cmp(big.NewFloat(20)) == -1 {
+	if gainPercentage.Cmp(big.NewFloat(7)) == 1 && gainPercentage.Cmp(big.NewFloat(20)) == -1 {
 		logs := "Triangular arbitrage opportunity found : " + order1[0] + "/" + order1[1] + "/" + order1[2] + " Gain: " + gainPercentage.Text('f', -1) + "%"
-		i.Logger.Slog.Info(logs)
+		logs += " " + orderedPairs1[0].Symbol.Symbol + " " + orderedPairs1[0].SymbolPrice.Text('f', -1) + orderedPairs1[1].Symbol.Symbol + " " + orderedPairs1[1].SymbolPrice.Text('f', -1) + orderedPairs1[2].Symbol.Symbol + " " + orderedPairs1[2].SymbolPrice.Text('f', -1)
+		// i.Logger.Slog.Info(logs)
 		filePath := "logs/" + triade.Assets[0] + "-" + triade.Assets[1] + "-" + triade.Assets[2] + ".txt"
 		i.Logger.FileLog(filePath, logs)
-		// ComputeTriangularOrders(i, orderedPairs1, gainPercentage)
+		ComputeTriangularOrders(i, orderedPairs1, gainPercentage)
 	}
 	// else if gainPercentage.Cmp(big.NewFloat(-0)) == -1 {
 	// 	// reverse the order

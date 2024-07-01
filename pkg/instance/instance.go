@@ -18,6 +18,7 @@ import (
 
 	binance_connector "github.com/binance/binance-connector-go"
 	"github.com/gorilla/websocket"
+	"github.com/kr/pretty"
 )
 
 type Instance struct {
@@ -59,7 +60,7 @@ func (i *Instance) Init() (err error) {
 
 	i.Logger.Slog.Info("Starting DeltΔ  BOT")
 
-	i.StartingStableAsset = "USDT"
+	i.StartingStableAsset = "BTC"
 
 	i.Logger.Slog.Info("Loading exchange info from Binance...")
 	// i.ExchangeInfo, err = binance.GetExchangeInfo()
@@ -148,9 +149,11 @@ func ComputeTriangularOrders(i *Instance, orderPairs OrderPairs, gainPercentage 
 	isOrdering = true
 	orderCount++
 
-	logs := "Triangular arbitrage opportunity found : " + orderPairs[0].From + "/" + orderPairs[1].From + "/" + orderPairs[2].From + " Gain: "
+	logs := "Triangular arbitrage opportunity found : " + orderPairs[0].From + "/" + orderPairs[1].From + "/" + orderPairs[2].From + " Gain: " + gainPercentage.Text('f', -1) + "%"
+	i.Logger.Slog.Info(logs)
 
 	var Balance = Balance{}
+	logBalance := map[string]float64{}
 
 	account, err := i.BinanceConn.NewGetAccountService().Do(context.Background())
 	if err != nil {
@@ -162,6 +165,7 @@ func ComputeTriangularOrders(i *Instance, orderPairs OrderPairs, gainPercentage 
 		if balance.Asset == i.StartingStableAsset {
 			float, _ := strconv.ParseFloat(balance.Free, 64)
 			Balance[i.StartingStableAsset] = big.NewFloat(float)
+			logBalance[i.StartingStableAsset] = float
 			if err != nil {
 				i.Logger.Slog.Error(err.Error())
 				return
@@ -170,17 +174,20 @@ func ComputeTriangularOrders(i *Instance, orderPairs OrderPairs, gainPercentage 
 		}
 	}
 
-	fmt.Println("initialBalance", Balance[i.StartingStableAsset].Text('f', -1))
-
 	for _, pair := range orderPairs {
-		fmt.Println("Sell", pair.From, "Buy", pair.To)
+		symbolPrice, _ := pair.SymbolPrice.Float64()
 		if helpers.CheckAssetIsBase(pair.To, pair.Symbol) {
 			Balance[pair.To] = new(big.Float).Quo(Balance[pair.From], pair.SymbolPrice)
+			logBalance[pair.To] = logBalance[pair.From] / symbolPrice
 		} else {
 			Balance[pair.To] = new(big.Float).Mul(Balance[pair.From], pair.SymbolPrice)
+			logBalance[pair.To] = logBalance[pair.From] * symbolPrice
 		}
-		fmt.Println("calculatedBalance", pair.To, Balance[pair.To].Text('f', -1))
 	}
+
+	pretty.Println(logBalance)
+
+	// os.Exit(0)
 
 	i.Logger.Slog.Info(logs)
 
@@ -224,18 +231,18 @@ func ComputeTriangularOrders(i *Instance, orderPairs OrderPairs, gainPercentage 
 
 			// quoteQty, _ := big.NewFloat(0).Quo(orderPair.SymbolPrice, big.NewFloat(fromBalance)).Float64()
 
-			qty, _ := Balance[orderPair.To].Float64()
+			buyingQty, _ := Balance[orderPair.To].Float64()
 			for _, filter := range orderPair.Symbol.Filters {
 				if filter.FilterType == "LOT_SIZE" {
 					stepSize, _ := strconv.ParseFloat(filter.StepSize, 64)
-					qty = math.Floor(qty/stepSize) * stepSize
+					buyingQty = math.Floor(buyingQty/stepSize) * stepSize
 				}
 			}
 
-			qty = helpers.FloorToPrecision(qty, int(orderPair.Symbol.BaseAssetPrecision))
-			i.Logger.Slog.Info(fmt.Sprintf("Order BUY Symbol:%s price:%s qty:%.10f", orderPair.Symbol.Symbol, orderPair.SymbolPrice.String(), qty))
+			buyingQty = helpers.FloorToPrecision(buyingQty, int(orderPair.Symbol.BaseAssetPrecision))
+			i.Logger.Slog.Info(fmt.Sprintf("Order BUY Symbol:%s price:%s qty:%.10f", orderPair.Symbol.Symbol, orderPair.SymbolPrice.String(), buyingQty))
 			_, err = i.BinanceConn.NewCreateOrderService().Symbol(orderPair.Symbol.Symbol).
-				Side("BUY").Type("MARKET").Quantity(qty).
+				Side("BUY").Type("MARKET").Quantity(buyingQty).
 				Do(context.Background())
 			if err != nil {
 				// fmt.Println(binance_connector.PrettyPrint(order))
@@ -245,21 +252,21 @@ func ComputeTriangularOrders(i *Instance, orderPairs OrderPairs, gainPercentage 
 		} else {
 
 			// fromBalance = helpers.FloorToPrecision(fromBalance, int(orderPair.Symbol.BaseAssetPrecision))
-			quoteqty, _ := Balance[orderPair.To].Float64()
+			sellingQty, _ := Balance[orderPair.From].Float64()
 
 			for _, filter := range orderPair.Symbol.Filters {
 				if filter.FilterType == "LOT_SIZE" {
 					stepSize, _ := strconv.ParseFloat(filter.StepSize, 64)
-					quoteqty = math.Floor(quoteqty/stepSize) * stepSize
+					sellingQty = math.Floor(sellingQty/stepSize) * stepSize
 				}
 			}
 
-			quoteqty = helpers.FloorToPrecision(quoteqty, int(orderPair.Symbol.QuotePrecision))
+			sellingQty = helpers.FloorToPrecision(sellingQty, int(orderPair.Symbol.BaseAssetPrecision))
 
-			i.Logger.Slog.Info(fmt.Sprintf("Order SELL Symbol:%s price:%s quoteQty:%.10f", orderPair.Symbol.Symbol, orderPair.SymbolPrice.String(), quoteqty))
+			i.Logger.Slog.Info(fmt.Sprintf("Order SELL Symbol:%s price:%s qty:%.10f", orderPair.Symbol.Symbol, orderPair.SymbolPrice.String(), sellingQty))
 
 			_, err = i.BinanceConn.NewCreateOrderService().Symbol(orderPair.Symbol.Symbol).
-				Side("SELL").Type("MARKET").QuoteOrderQty(quoteqty).
+				Side("SELL").Type("MARKET").Quantity(sellingQty).
 				Do(context.Background())
 			if err != nil {
 				i.Logger.Slog.Error(err.Error())
