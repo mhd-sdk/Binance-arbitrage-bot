@@ -62,7 +62,7 @@ func (i *Instance) ScanOpportunities(triade models.Triade) {
 
 	gainPercentage := new(big.Float).Sub(calculatedBalance[i.StartingStableAsset], initialBalance[i.StartingStableAsset])
 
-	if gainPercentage.Cmp(big.NewFloat(10)) == 1 && gainPercentage.Cmp(big.NewFloat(20)) == -1 {
+	if gainPercentage.Cmp(big.NewFloat(5)) == 1 && gainPercentage.Cmp(big.NewFloat(20)) == -1 {
 		logs := "Triangular arbitrage opportunity found : " + order1[0] + "/" + order1[1] + "/" + order1[2] + " Gain: " + gainPercentage.Text('f', -1) + "%"
 		i.Logger.Slog.Info(logs)
 		filePath := "logs/" + triade.Assets[0] + "-" + triade.Assets[1] + "-" + triade.Assets[2] + ".txt"
