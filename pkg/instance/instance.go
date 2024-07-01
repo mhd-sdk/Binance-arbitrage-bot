@@ -141,90 +141,132 @@ func (i *Instance) Watch() {
 var orderCount = 0
 var isOrdering = false
 
-func (i *Instance) ComputeTriangularOrders(orderPairs OrderPairs) {
+func ComputeTriangularOrders(i *Instance, orderPairs OrderPairs, gainPercentage *big.Float) {
 	if orderCount == 1 || isOrdering {
 		return
 	}
 	isOrdering = true
 	orderCount++
-	binanceurl1 := "https://www.binance.com/en/trade/" + orderPairs[0].Symbol.Symbol
-	binanceurl2 := "https://www.binance.com/en/trade/" + orderPairs[1].Symbol.Symbol
-	binanceurl3 := "https://www.binance.com/en/trade/" + orderPairs[2].Symbol.Symbol
-	i.Logger.Slog.Info(binanceurl1)
-	i.Logger.Slog.Info(binanceurl2)
-	i.Logger.Slog.Info(binanceurl3)
+
+	logs := "Triangular arbitrage opportunity found : " + orderPairs[0].From + "/" + orderPairs[1].From + "/" + orderPairs[2].From + " Gain: "
+
+	var Balance = Balance{}
+
+	account, err := i.BinanceConn.NewGetAccountService().Do(context.Background())
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	for _, balance := range account.Balances {
+		if balance.Asset == i.StartingStableAsset {
+			float, _ := strconv.ParseFloat(balance.Free, 64)
+			Balance[i.StartingStableAsset] = big.NewFloat(float)
+			if err != nil {
+				i.Logger.Slog.Error(err.Error())
+				return
+			}
+			break
+		}
+	}
+
+	fmt.Println("initialBalance", Balance[i.StartingStableAsset].Text('f', -1))
+
+	for _, pair := range orderPairs {
+		fmt.Println("Sell", pair.From, "Buy", pair.To)
+		if helpers.CheckAssetIsBase(pair.To, pair.Symbol) {
+			Balance[pair.To] = new(big.Float).Quo(Balance[pair.From], pair.SymbolPrice)
+		} else {
+			Balance[pair.To] = new(big.Float).Mul(Balance[pair.From], pair.SymbolPrice)
+		}
+		fmt.Println("calculatedBalance", pair.To, Balance[pair.To].Text('f', -1))
+	}
+
+	i.Logger.Slog.Info(logs)
 
 	for _, orderPair := range orderPairs {
 		// Step 1: Get the account balance
-		account, err := i.BinanceConn.NewGetAccountService().Do(context.Background())
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
+		// account, err := i.BinanceConn.NewGetAccountService().Do(context.Background())
+		// if err != nil {
+		// 	fmt.Println(err)
+		// 	return
+		// }
 
-		var fromBalance float64
-		for _, balance := range account.Balances {
-			if balance.Asset == orderPair.From {
-				fromBalance, err = strconv.ParseFloat(balance.Free, 64)
-				if err != nil {
-					i.Logger.Slog.Error(err.Error())
-					return
-				}
-				break
-			}
-		}
+		// var fromBalance float64
+		// for _, balance := range account.Balances {
+		// 	if balance.Asset == orderPair.From {
+		// 		fromBalance, err = strconv.ParseFloat(balance.Free, 64)
+		// 		if err != nil {
+		// 			i.Logger.Slog.Error(err.Error())
+		// 			return
+		// 		}
+		// 		break
+		// 	}
+		// }
 
-		safetyMargin := 0.5
-		fromBalance = fromBalance * safetyMargin
+		// safetyMargin := 0.5
+		// fromBalance = fromBalance * safetyMargin
 
 		// quantity, _ := new(big.Float).Quo(big.NewFloat(fromBalance), price).SetPrec(uint(math.Ceil(float64(6) * 3.32))).Float64()
 		if helpers.CheckAssetIsBase(orderPair.To, orderPair.Symbol) {
 			// check symbolFilters
-			assetBuyedQty, _ := big.NewFloat(0).Quo(big.NewFloat(fromBalance), orderPair.SymbolPrice).Float64()
-			fmt.Println(assetBuyedQty)
-			for _, filter := range orderPair.Symbol.Filters {
-				if filter.FilterType == "LOT_SIZE" {
-					// changer fromBalance pour qu'il soit un multiple de stepSize
-					stepSize, _ := strconv.ParseFloat(filter.StepSize, 64)
-					assetBuyedQty = math.Floor(assetBuyedQty/stepSize) * stepSize
-				}
-			}
-			fmt.Println(assetBuyedQty)
-			assetBuyedQty = helpers.FloorToPrecision(assetBuyedQty, int(orderPair.Symbol.BaseAssetPrecision))
-			fmt.Println(assetBuyedQty)
+			// assetBuyedQty, _ := big.NewFloat(0).Quo(big.NewFloat(fromBalance), orderPair.SymbolPrice).Float64()
+			// fmt.Println(assetBuyedQty)
+			// for _, filter := range orderPair.Symbol.Filters {
+			// 	if filter.FilterType == "LOT_SIZE" {
+			// 		// changer fromBalance pour qu'il soit un multiple de stepSize
+			// 		stepSize, _ := strconv.ParseFloat(filter.StepSize, 64)
+			// 		assetBuyedQty = math.Floor(assetBuyedQty/stepSize) * stepSize
+			// 	}
+			// }
+			// fmt.Println(assetBuyedQty)
+			// fmt.Println(assetBuyedQty)
 
 			// quoteQty, _ := big.NewFloat(0).Quo(orderPair.SymbolPrice, big.NewFloat(fromBalance)).Float64()
 
-			i.Logger.Slog.Info(fmt.Sprintf("Order BUY Symbol:%s price:%s Qty:%.10f", orderPair.Symbol.Symbol, orderPair.SymbolPrice.String(), assetBuyedQty))
+			qty, _ := Balance[orderPair.To].Float64()
+			for _, filter := range orderPair.Symbol.Filters {
+				if filter.FilterType == "LOT_SIZE" {
+					stepSize, _ := strconv.ParseFloat(filter.StepSize, 64)
+					qty = math.Floor(qty/stepSize) * stepSize
+				}
+			}
 
+			qty = helpers.FloorToPrecision(qty, int(orderPair.Symbol.BaseAssetPrecision))
+			i.Logger.Slog.Info(fmt.Sprintf("Order BUY Symbol:%s price:%s qty:%.10f", orderPair.Symbol.Symbol, orderPair.SymbolPrice.String(), qty))
 			_, err = i.BinanceConn.NewCreateOrderService().Symbol(orderPair.Symbol.Symbol).
-				Side("BUY").Type("MARKET").Quantity(assetBuyedQty).
+				Side("BUY").Type("MARKET").Quantity(qty).
 				Do(context.Background())
 			if err != nil {
 				// fmt.Println(binance_connector.PrettyPrint(order))
 				i.Logger.Slog.Error(err.Error())
 			}
+
 		} else {
+
+			// fromBalance = helpers.FloorToPrecision(fromBalance, int(orderPair.Symbol.BaseAssetPrecision))
+			quoteqty, _ := Balance[orderPair.To].Float64()
+
 			for _, filter := range orderPair.Symbol.Filters {
 				if filter.FilterType == "LOT_SIZE" {
 					stepSize, _ := strconv.ParseFloat(filter.StepSize, 64)
-					fromBalance = math.Floor(fromBalance/stepSize) * stepSize
+					quoteqty = math.Floor(quoteqty/stepSize) * stepSize
 				}
 			}
 
-			fromBalance = helpers.FloorToPrecision(fromBalance, int(orderPair.Symbol.BaseAssetPrecision))
+			quoteqty = helpers.FloorToPrecision(quoteqty, int(orderPair.Symbol.QuotePrecision))
 
-			i.Logger.Slog.Info(fmt.Sprintf("Order SELL Symbol:%s price:%s Qty:%.10f", orderPair.Symbol.Symbol, orderPair.SymbolPrice.String(), fromBalance))
+			i.Logger.Slog.Info(fmt.Sprintf("Order SELL Symbol:%s price:%s quoteQty:%.10f", orderPair.Symbol.Symbol, orderPair.SymbolPrice.String(), quoteqty))
 
 			_, err = i.BinanceConn.NewCreateOrderService().Symbol(orderPair.Symbol.Symbol).
-				Side("SELL").Type("MARKET").Quantity(fromBalance).
+				Side("SELL").Type("MARKET").QuoteOrderQty(quoteqty).
 				Do(context.Background())
 			if err != nil {
 				i.Logger.Slog.Error(err.Error())
 			}
 		}
 
-		time.Sleep(1 * time.Second)
+		// time.Sleep(1 * time.Second)
 	}
 	os.Exit(0)
 	isOrdering = false

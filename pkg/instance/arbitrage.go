@@ -19,7 +19,7 @@ type OrderPair struct {
 
 type Balance map[string]*big.Float
 
-func (i Instance) ScanOpportunities(triade models.Triade) {
+func (i *Instance) ScanOpportunities(triade models.Triade) {
 	var initialBalance = Balance{
 		i.StartingStableAsset: big.NewFloat(100),
 	}
@@ -62,16 +62,12 @@ func (i Instance) ScanOpportunities(triade models.Triade) {
 
 	gainPercentage := new(big.Float).Sub(calculatedBalance[i.StartingStableAsset], initialBalance[i.StartingStableAsset])
 
-	if gainPercentage.Cmp(big.NewFloat(2)) == 1 && gainPercentage.Cmp(big.NewFloat(20)) == -1 {
-		// logs := "Triangular arbitrage opportunity found : " + order1[0] + "/" + order1[1] + "/" + order1[2] + " Gain: " + gainPercentage.Text('f', -1) + "%"
-		// i.Logger.Slog.Info(logs)
-
-		// logs = "Binance URLS: " + binanceurl1 + " " + binanceurl2 + " " + binanceurl3
-		// i.Logger.Slog.Info(logs)
-
-		// filePath := "logs/" + triade.Assets[0] + "-" + triade.Assets[1] + "-" + triade.Assets[2] + ".txt"
-		// i.Logger.FileLog(filePath, logs)
-		i.ComputeTriangularOrders(orderedPairs1)
+	if gainPercentage.Cmp(big.NewFloat(10)) == 1 && gainPercentage.Cmp(big.NewFloat(20)) == -1 {
+		logs := "Triangular arbitrage opportunity found : " + order1[0] + "/" + order1[1] + "/" + order1[2] + " Gain: " + gainPercentage.Text('f', -1) + "%"
+		i.Logger.Slog.Info(logs)
+		filePath := "logs/" + triade.Assets[0] + "-" + triade.Assets[1] + "-" + triade.Assets[2] + ".txt"
+		i.Logger.FileLog(filePath, logs)
+		// ComputeTriangularOrders(i, orderedPairs1, gainPercentage)
 	}
 	// else if gainPercentage.Cmp(big.NewFloat(-0)) == -1 {
 	// 	// reverse the order
@@ -125,8 +121,6 @@ func (i Instance) ScanOpportunities(triade models.Triade) {
 	// 		// logs = "Binance URLS: " + binanceurl1 + " " + binanceurl2 + " " + binanceurl3
 	// 		// i.Logger.Slog.Info(logs)
 
-	// 		// filePath := "logs/" + triade.Assets[0] + "-" + triade.Assets[1] + "-" + triade.Assets[2] + ".txt"
-	// 		// i.Logger.FileLog(filePath, logs)
 	// 		// i.ComputeTriangularOrders(orderedPairs2)
 	// 	}
 	// }
